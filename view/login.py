@@ -15,6 +15,16 @@ def run():
     """Login Page for MikroTik Connection"""
     st.subheader("🔒 Login to MikroTik")
 
+    # Ensure session state variables exist
+    if "ssh_client" not in st.session_state:
+        st.session_state["ssh_client"] = None
+    if "connection_status" not in st.session_state:
+        st.session_state["connection_status"] = "🔴 Not connected"
+
+    # Sidebar connection status display
+    st.sidebar.info(st.session_state["connection_status"])
+
+    # User input fields
     ip_address = st.text_input("IP Address")
     port = st.text_input("Port", value="22")
     username = st.text_input("Username")
@@ -27,9 +37,12 @@ def run():
 
             if isinstance(connection, paramiko.SSHClient):
                 st.success("✅ Connected successfully!")
-                st.session_state["currentPage"] = "Welcome"  # Update page state
+                st.session_state["ssh_client"] = connection  # Store connection in session
                 st.session_state["connection_status"] = f"🟢 Connected to {ip_address} on port {port}"
-                st.rerun()  # Force rerun to refresh the UI
+                st.session_state["mikrotik_ip"] = ip_address
+                st.session_state["mikrotik_port"] = port
+                st.session_state["currentPage"] = "Welcome"  # Redirect to Welcome page
+                st.rerun()  # Refresh UI
             else:
                 st.session_state["connection_status"] = "🔴 Connection failed!"
                 st.error(f"❌ Connection failed: {connection}")

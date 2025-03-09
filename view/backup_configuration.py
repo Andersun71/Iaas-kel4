@@ -1,32 +1,86 @@
 import streamlit as st
-import pandas as pd
+import paramiko
+import time
+import os
+
+def list_backup_files(client):
+    """Retrieve a list of backup files from MikroTik via SFTP."""
+    try:
+        with client.open_sftp() as sftp:
+            files = sftp.listdir("/")
+            backup_files = [file for file in files if file.endswith('.backup')]
+            return backup_files
+    except Exception as e:
+        st.error(f"Failed to get the list of backup files: {e}")
+        return []
+
+def create_backup(ssh_client, backup_name):
+    """Create a new backup file on MikroTik."""
+    try:
+        command = f'/system backup save name={backup_name}'
+        ssh_client.exec_command(command)
+        time.sleep(2)  # Wait for backup to be created
+        st.success(f"✅ Backup `{backup_name}.backup` created successfully!")
+    except Exception as e:
+        st.error(f"❌ Failed to create backup: {e}")
+
+def download_backup(ssh_client, backup_name):
+    """Download a backup file from MikroTik to the client device."""
+    try:
+        with ssh_client.open_sftp() as sftp:
+            local_path = f"./{backup_name}"
+            remote_path = f"/{backup_name}"
+            sftp.get(remote_path, local_path)
+
+        with open(local_path, "rb") as file:
+            file_bytes = file.read()
+
+        # Provide a download button
+        st.download_button(
+            label="⬇️ Download Backup File",
+            data=file_bytes,
+            file_name=backup_name,
+            mime="application/octet-stream"
+        )
+
+        os.remove(local_path)  # Cleanup temporary file after download
+        st.success(f"✅ Backup `{backup_name}` is ready to download!")
+    except Exception as e:
+        st.error(f"❌ Failed to download backup: {e}")
 
 def run():
-    st.subheader("Backup Configuration")
+    """Backup Configuration Page"""
+    st.subheader("📂 MikroTik Backup Configuration")
 
-    st.text_input("Backup name")
+    # Ensure an active connection
+    if "ssh_client" not in st.session_state or st.session_state["ssh_client"] is None:
+        st.error("⚠️ No active MikroTik connection. Please log in first.")
+        return
 
-    data = {
-        "Name": ["Backup_1", "Backup_2", "Backup_3"],
-        "Type": ["Backup", "Backup", "Backup"],
-        "Size": ["2GB", "1GB", "500MB"],
-        "Created At": ["2025-02-18 10:00", "2025-02-17 09:30", "2025-02-16 08:45"]
-    }
-    
-    df = pd.DataFrame(data)
+    ssh_client = st.session_state["ssh_client"]
 
-    st.dataframe(df, use_container_width=True)
+    # Display backup files
+    st.write("### 🔍 Available Backup Files")
+    backup_files = list_backup_files(ssh_client)
 
-    col1, col2, col3 = st.columns([0.9, 1, 4.5])
+    if backup_files:
+        selected_file = st.selectbox("Select a backup file to download:", backup_files)
 
-    with col1:
-        if st.button("Backup"):
-            st.success("Konfigurasi berhasil disimpan.")
+        if st.button("⬇️ Fetch Backup for Download"):
+            download_backup(ssh_client, selected_file)
+    else:
+        st.warning("No backup files found.")
 
-    with col2:
-        if st.button("Download"):
-            st.success("File berhasil diunduh.")
+    # Create new backup
+    st.write("### ✨ Create New Backup")
+    backup_name = st.text_input("Enter backup name (without .backup extension):")
 
-    with col3:
-        if st.button("Cancel"):
-            st.warning("Input dibatalkan.")
+    if st.button("🛠️ Create Backup"):
+        if backup_name:
+            create_backup(ssh_client, backup_name)
+            st.rerun()  # Refresh the file list
+        else:
+            st.warning("⚠️ Please enter a backup name.")
+
+if __name__ == "__main__":
+    run()

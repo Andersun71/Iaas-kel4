@@ -30,6 +30,8 @@ with st.sidebar.expander("⚙️ Basic Configuration"):
         change_page("Bandwidth Fix")
     if st.button("Disable/Enable Interfaces"):
         change_page("Disable/Enable Interfaces")
+    if st.button("IP Configuration"):
+        change_page("IP Configuration")
 
 with st.sidebar.expander("🗂️ Backup Configuration"):
     if st.button("Backup Configuration"):
@@ -49,7 +51,8 @@ PAGES = {
     "Disable/Enable Interfaces": "disable_enable",
     "Backup Configuration": "backup_configuration",
     "Logout": "logout",
-    "Welcome": "welcome"
+    "Welcome": "welcome",
+    "IP Configuration": "ip_configuration"
 }
 
 # Load the selected page dynamically
