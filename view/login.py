@@ -1,8 +1,8 @@
 import streamlit as st
 import paramiko
-from getpass import getpass
 
 def ssh_connect(ip_address, port, username, password):
+    """Establish SSH connection to MikroTik."""
     try:
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -12,22 +12,27 @@ def ssh_connect(ip_address, port, username, password):
         return str(e)
 
 def run():
-    st.subheader("Login to MikroTik")
+    """Login Page for MikroTik Connection"""
+    st.subheader("🔒 Login to MikroTik")
+
     ip_address = st.text_input("IP Address")
     port = st.text_input("Port", value="22")
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
-    
-    if st.button("Submit"):
+
+    if st.button("Submit", key="login_button"):
         if ip_address and port and username and password:
-            st.write(f"Connecting to {ip_address} on port {port}...")
+            st.write(f"Connecting to `{ip_address}` on port `{port}`...")
             connection = ssh_connect(ip_address, port, username, password)
+
             if isinstance(connection, paramiko.SSHClient):
-                st.success("Connected successfully!")
+                st.success("✅ Connected successfully!")
+                st.session_state["currentPage"] = "Welcome"  # Update page state
+                st.rerun()  # Force rerun to refresh the UI
             else:
-                st.error(f"Connection failed: {connection}")
+                st.error(f"❌ Connection failed: {connection}")
         else:
-            st.warning("Please fill in all fields.")
+            st.warning("⚠️ Please fill in all fields.")
 
 if __name__ == "__main__":
     run()
