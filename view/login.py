@@ -28,8 +28,10 @@ def run():
             if isinstance(connection, paramiko.SSHClient):
                 st.success("✅ Connected successfully!")
                 st.session_state["currentPage"] = "Welcome"  # Update page state
+                st.session_state["connection_status"] = f"🟢 Connected to {ip_address} on port {port}"
                 st.rerun()  # Force rerun to refresh the UI
             else:
+                st.session_state["connection_status"] = "🔴 Connection failed!"
                 st.error(f"❌ Connection failed: {connection}")
         else:
             st.warning("⚠️ Please fill in all fields.")

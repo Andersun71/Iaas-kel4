@@ -5,12 +5,17 @@ import importlib
 if "currentPage" not in st.session_state:
     st.session_state["currentPage"] = "Login"
 
+if "connection_status" not in st.session_state:
+    st.session_state["connection_status"] = "⚪ Not Connected"
+
 # Function to switch pages
 def change_page(page_name):
     st.session_state["currentPage"] = page_name
 
 # Sidebar Navigation
 st.sidebar.title("📌 Menu")
+
+st.sidebar.markdown(f"**{st.session_state['connection_status']}**")
 
 with st.sidebar.expander("🔒 Login", expanded=True):
     if st.button("Connect"):
@@ -32,6 +37,7 @@ with st.sidebar.expander("🗂️ Backup Configuration"):
 
 with st.sidebar.expander("🚪 Logout"):
     if st.button("Disconnect"):
+        st.session_state["connection_status"] = "⚪ Not Connected"
         change_page("Logout")
 
 # Page Routing
