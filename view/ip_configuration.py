@@ -1,142 +1,138 @@
 import streamlit as st
-import paramiko
 import time
-import pandas as pd
-import re
 
-def get_interfaces(ssh_client):
-    """Retrieve a list of interfaces from MikroTik."""
-    try:
-        stdin, stdout, stderr = ssh_client.exec_command("/interface print without-paging")
-        output = stdout.read().decode()
+def execute_command(client, command):
+    stdin, stdout, stderr = client.exec_command(command)
+    return stdout.channel.recv_exit_status(), stdout.read().decode().strip(), stderr.read().decode().strip()
 
-        interfaces = []
-        for line in output.split("\n"):
-            match = re.match(r"^\s*(\d+)\s+([\w-]+)", line)  # Extracts ID and Name
-            if match:
-                interfaces.append({"ID": match.group(1), "Name": match.group(2)})
+def get_interface(client):
+    _, output, _ = execute_command(client, "/interface print terse")
+    
+    interfaces = []
+    for line in output.split("\n"):
+        parts = line.split()
+        if len(parts) >= 3:
+            interfaces.append(parts[2].replace("name=", ""))
+            
+    return interfaces
+
+def rerun_after(timer):
+    time.sleep(timer)
+    st.rerun()
+
+def subnet_mask_to_cidr(subnet_mask):
+    return sum(bin(int(x)).count('1') for x in subnet_mask.split('.'))
+
+def delete_ip(client, index, address):
+    _, _, error = execute_command(client, f"/ip address remove numbers={index}")
+    if error:
+        st.error(f"Failed to delete {address}: {error}")
+    else:
+        st.success(f"Deleted IP {address}")
+        rerun_after(3)
         
-        return interfaces
-    except Exception as e:
-        st.error(f"Failed to retrieve interfaces: {e}")
-        return []
+def get_ip(output):    
+    col_headers = st.columns([3,2,1.5,1,1])
+    with col_headers[0]: st.markdown("**Address**")
+    with col_headers[1]: st.markdown("**Network**")
+    with col_headers[2]: st.markdown("**Interface**")
+    with col_headers[3]: st.markdown("**Status**")
+    with col_headers[4]: st.markdown("**Action**")
+    
+    for line in output.split("\n"):
+        if not line.strip():
+            continue
+        parts = line.split()
+        if len(parts) >= 4:
+            index = parts[0].split('=')[-1]  
+            address = parts[1].split('=')[-1]
+            network = parts[2].split('=')[-1]
+            interface = parts[3].split('=')[-1]
+            
+            status_code = parts[0][0]
+            status_text = {
+                "D": "Dynamic",
+                "X": "Disabled",
+                "I": "Invalid"
+            }.get(status_code, "Active")
+            
+            cols = st.columns([3,2,1.5,1,1])
+            with cols[0]: st.write(address)
+            with cols[1]: st.write(network)
+            with cols[2]: st.write(interface)
+            with cols[3]: st.write(status_text)
+            with cols[4]:
+                if st.button("Delete", key=f"del_{index}", use_container_width=True):
+                    delete_ip(client, index, address)
 
-def get_ip_addresses(ssh_client):
-    """Retrieve a list of IP addresses assigned to interfaces."""
+def show_ip(client):
+    st.subheader("IP Addresses")
+    _, output, _ = execute_command(client, "/ip address print terse")
+    get_ip(output)
+    
+def enable_disable_interface_btn(client, selected_interface):
+    col1, _, col2 = st.columns([1,2,1])
+    with col1:
+        if st.button("Turn On Connection", use_container_width=True):
+            _, _, error = execute_command(client, f"/interface enable {selected_interface}")
+            if error:
+                st.error(f"Unable to enable {selected_interface}: {error}")
+            else:
+                st.success(f"Enabled {selected_interface}")
+    with col2:
+        if st.button("Turn Off Connection", use_container_width=True):
+            _, _, error = execute_command(client, f"/interface disable {selected_interface}")
+            if error:
+                st.error(f"Unable to disable {selected_interface}: {error}")
+            else:
+                st.success(f"Disabled {selected_interface}")
+
+def apply_conf(client, selected_interface, ip_address, subnet_mask, remove_old):
     try:
-        stdin, stdout, stderr = ssh_client.exec_command("/ip address print without-paging")
-        output = stdout.read().decode()
-
-        ip_list = []
-        for line in output.split("\n"):
-            match = re.match(r"^\s*(\d+)\s+([\d./]+)\s+\S+\s+(\S+)", line)  # Extracts ID, IP, and Interface
-            if match:
-                ip_list.append({
-                    "ID": match.group(1),
-                    "Address": match.group(2),
-                    "Interface": match.group(3),
-                })
+        cidr = subnet_mask_to_cidr(subnet_mask)
+        ip_with_subnet = f"{ip_address}/{cidr}"
         
-        return ip_list
+        if remove_old:
+            execute_command(client, f"/ip address remove [find interface={selected_interface}]")
+            st.warning(f"Removing old IPs on {selected_interface}...")
+        
+        _, _, error = execute_command(client, f"/ip address add address={ip_with_subnet} interface={selected_interface}")
+        if error:
+            st.error(f"Error: {error}")
+        else:
+            st.success(f"New IP {ip_with_subnet} applied to {selected_interface}")
+            rerun_after(3)
+        
     except Exception as e:
-        st.error(f"Failed to retrieve IP addresses: {e}")
-        return []
-
-def add_ip(ssh_client, ip_address, interface):
-    """Assign a new IP address to an interface."""
-    try:
-        command = f"/ip address add address={ip_address} interface={interface}"
-        ssh_client.exec_command(command)
-        time.sleep(2)
-        st.success(f"✅ IP {ip_address} added to {interface} successfully!")
-    except Exception as e:
-        st.error(f"❌ Failed to add IP: {e}")
-
-def edit_ip(ssh_client, ip_id, new_ip):
-    """Edit an existing IP address."""
-    try:
-        command = f"/ip address set {ip_id} address={new_ip}"
-        ssh_client.exec_command(command)
-        time.sleep(2)
-        st.success(f"✅ IP modified to {new_ip} successfully!")
-    except Exception as e:
-        st.error(f"❌ Failed to edit IP: {e}")
-
-def delete_ip(ssh_client, ip_id):
-    """Remove an IP address from an interface."""
-    try:
-        command = f"/ip address remove {ip_id}"
-        ssh_client.exec_command(command)
-        time.sleep(2)
-        st.success(f"✅ IP removed successfully!")
-    except Exception as e:
-        st.error(f"❌ Failed to delete IP: {e}")
+        st.error(f"Failed to Set IP: {e}")
 
 def run():
-    """IP Configuration Page"""
-    st.subheader("🌐 MikroTik IP Configuration")
-
-    # Ensure active connection
-    if "ssh_client" not in st.session_state or st.session_state["ssh_client"] is None:
-        st.error("⚠️ No active MikroTik connection. Please log in first.")
+    st.header("Network Settings")
+    
+    # Retrieve SSH client from session state
+    client = st.session_state.get("ssh_client")
+    
+    if not client:
+        st.warning("❌ No connection detected. Please log in first.")
         return
 
-    ssh_client = st.session_state["ssh_client"]
+    tab1, tab2 = st.tabs(["Current Addresses", "Set New Address"])
 
-    # Show list of interfaces as table
-    st.write("### 🔗 Available Interfaces")
-    interfaces = get_interfaces(ssh_client)
-    if interfaces:
-        df_interfaces = pd.DataFrame(interfaces)
-        st.table(df_interfaces)
-    else:
-        st.warning("No interfaces found.")
+    with tab1:
+        show_ip(client)
 
-    # Show list of IP addresses as table
-    st.write("### 📋 Assigned IP Addresses")
-    ip_addresses = get_ip_addresses(ssh_client)
-    if ip_addresses:
-        df_ips = pd.DataFrame(ip_addresses)
-        st.table(df_ips)
-    else:
-        st.warning("No IP addresses found.")
-
-    # Add new IP address section
-    st.write("### ➕ Add New IP Address")
-    with st.expander("Add New IP"):
-        new_ip = st.text_input("Enter IP Address (e.g., 192.168.1.10/24):")
-        selected_interface = st.selectbox("Select Interface:", [i["Name"] for i in interfaces])
-
-        if st.button("✅ Add IP"):
-            if new_ip and selected_interface:
-                add_ip(ssh_client, new_ip, selected_interface)
-                st.experimental_rerun()
-            else:
-                st.warning("⚠️ Please fill in all fields.")
-
-    # Edit existing IP section
-    st.write("### ✏️ Edit Existing IP")
-    if ip_addresses:
-        with st.expander("Edit IP Address"):
-            selected_ip = st.selectbox("Select IP to Edit:", ip_addresses, format_func=lambda ip: f"{ip['Address']} on {ip['Interface']}")
-            new_ip_value = st.text_input("Enter new IP Address:")
-
-            if st.button("✏️ Update IP"):
-                if new_ip_value:
-                    edit_ip(ssh_client, selected_ip['ID'], new_ip_value)
-                    st.experimental_rerun()
-                else:
-                    st.warning("⚠️ Please enter a new IP address.")
-
-    # Delete IP section
-    st.write("### ❌ Delete IP Address")
-    if ip_addresses:
-        with st.expander("Delete IP Address"):
-            selected_ip_to_delete = st.selectbox("Select IP to Delete:", ip_addresses, format_func=lambda ip: f"{ip['Address']} on {ip['Interface']}")
-
-            if st.button("❌ Remove IP"):
-                delete_ip(ssh_client, selected_ip_to_delete['ID'])
-                st.experimental_rerun()
-
-if __name__ == "__main__":
-    run()
+    with tab2:
+        interfaces = get_interface(client)
+        if not interfaces:
+            st.warning("Interfaces not found")
+            return
+            
+        selected_interface = st.selectbox("Choose Connection Port:", interfaces, index=None)
+        enable_disable_interface_btn(client, selected_interface)
+        
+        ip_address = st.text_input("IP Address:", placeholder="Enter the IP address", help="Example: 192.168.88.1")
+        subnet_mask = st.text_input("Subnetmask:", placeholder="Enter a subnet mask", help="Example: 255.255.255.0")
+        remove_old = st.checkbox("Replace existing address", True)
+        
+        if st.button("Save Settings"):
+            apply_conf(client, selected_interface, ip_address, subnet_mask, remove_old)
