@@ -23,7 +23,13 @@ def rerun_after(timer):
 def subnet_mask_to_cidr(subnet_mask):
     return sum(bin(int(x)).count('1') for x in subnet_mask.split('.'))
 
-def delete_ip(client, index, address):
+def delete_ip(index, address):
+    """Deletes the IP address from MikroTik using the stored SSH client."""
+    client = st.session_state.get("ssh_client")
+    if not client:
+        st.error("❌ No SSH connection detected. Please log in first.")
+        return
+
     _, _, error = execute_command(client, f"/ip address remove numbers={index}")
     if error:
         st.error(f"Failed to delete {address}: {error}")
@@ -62,8 +68,8 @@ def get_ip(output):
             with cols[2]: st.write(interface)
             with cols[3]: st.write(status_text)
             with cols[4]:
-                if st.button("Delete", key=f"del_{index}", use_container_width=True):
-                    delete_ip(client, index, address)
+                if st.button(f"Delete", key=f"del_{index}", use_container_width=True):
+                    delete_ip(index, address)  # ✅ Pass only `index` and `address`
 
 def show_ip(client):
     st.subheader("IP Addresses")

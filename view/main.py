@@ -28,8 +28,8 @@ with st.sidebar.expander("⚙️ Basic Configuration"):
         change_page("Firewall Filtering")
     if st.button("Bandwidth Fix"):
         change_page("Bandwidth Fix")
-    if st.button("Disable/Enable Interfaces"):
-        change_page("Disable/Enable Interfaces")
+    # if st.button("Disable/Enable Interfaces"):
+    #     change_page("Disable/Enable Interfaces")
     if st.button("IP Configuration"):
         change_page("IP Configuration")
 
@@ -48,7 +48,7 @@ PAGES = {
     "SSID & Password": "ssid_password",
     "Firewall Filtering": "firewall_filtering",
     "Bandwidth Fix": "fix_bandwidth",
-    "Disable/Enable Interfaces": "disable_enable",
+    # "Disable/Enable Interfaces": "disable_enable",
     "Backup Configuration": "backup_configuration",
     "Logout": "logout",
     "Welcome": "welcome",
