@@ -22,17 +22,19 @@ with st.sidebar.expander("🔒 Login", expanded=True):
         change_page("Login")
 
 with st.sidebar.expander("⚙️ Basic Configuration"):
+    if st.button("IP Configuration"):
+        change_page("IP Configuration")
     if st.button("SSID & Password"):
         change_page("SSID & Password")
     if st.button("Firewall Filtering"):
         change_page("Firewall Filtering")
     if st.button("Bandwidth Fix"):
         change_page("Bandwidth Fix")
+    if st.button("DNS Configuration"):
+        change_page("DNS Configuration")
     # if st.button("Disable/Enable Interfaces"):
     #     change_page("Disable/Enable Interfaces")
-    if st.button("IP Configuration"):
-        change_page("IP Configuration")
-
+    
 with st.sidebar.expander("🗂️ Backup Configuration"):
     if st.button("Backup Configuration"):
         change_page("Backup Configuration")
@@ -52,7 +54,8 @@ PAGES = {
     "Backup Configuration": "backup_configuration",
     "Logout": "logout",
     "Welcome": "welcome",
-    "IP Configuration": "ip_configuration"
+    "IP Configuration": "ip_configuration",
+    "DNS Configuration":"dns"
 }
 
 # Load the selected page dynamically
