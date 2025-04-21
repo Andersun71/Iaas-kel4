@@ -62,7 +62,7 @@ PAGES = {
 page_name = st.session_state["currentPage"]
 
 if page_name in PAGES:
-    st.header(f"NetEzz - {page_name}")
+    st.header(f"NetEZ - {page_name}")
     try:
         module = importlib.import_module(PAGES[page_name])
         module.run()

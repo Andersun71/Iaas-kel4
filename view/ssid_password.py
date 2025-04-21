@@ -52,10 +52,10 @@ def run():
         return
     
     # Retrieve current SSID & password
-    current_ssid, current_password = get_current_wifi_settings(client)
+    # current_ssid, current_password = get_current_wifi_settings(client)
     
-    st.write(f"**Current SSID:** `{current_ssid}`")
-    st.write(f"**Current Password:** `{current_password}`")
+    # st.write(f"**Current SSID:** `{current_ssid}`")
+    # st.write(f"**Current Password:** `{current_password}`")
 
     new_ssid = st.text_input("Enter New SSID:", placeholder="New WiFi Name")
     new_password = st.text_input("Enter New WiFi Password:", placeholder="New Password", type="password")
